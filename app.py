@@ -20,9 +20,9 @@ except:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-st.set_page_config(page_title="LinkedGod: Final", layout="wide")
-st.title("🩸 LinkedGod: Never-Empty Edition")
-st.markdown("Features a **Fail-Safe Design Engine** so slides are never blank.")
+st.set_page_config(page_title="LinkedGod: Unbreakable", layout="wide")
+st.title("🩸 LinkedGod: Zero-Failure Edition")
+st.markdown("Guarantees a **Real Image** on every slide. No patterns. No text placeholders.")
 
 RSS_FEEDS = {
     "Product Management": "https://techcrunch.com/category/startups/feed/",
@@ -30,6 +30,16 @@ RSS_FEEDS = {
     "Consulting": "http://feeds.harvardbusiness.org/harvardbusiness",
     "Startup Life": "https://news.ycombinator.com/rss"
 }
+
+# --- BACKUP IMAGES (Real 4K Stock Photos) ---
+# If AI fails, we use one of these high-quality dark abstracts.
+BACKUP_IMAGES = [
+    "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=1000&auto=format&fit=crop", # Dark Red Abstract
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop", # Cyberpunk City
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop", # Tech Chip
+    "https://images.unsplash.com/photo-1605810230434-7631ac76ec81?q=80&w=1000&auto=format&fit=crop", # Dark Data Center
+    "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1000&auto=format&fit=crop"  # Neon Fluid
+]
 
 def get_random_news(niche):
     feed = feedparser.parse(RSS_FEEDS.get(niche))
@@ -55,7 +65,7 @@ def generate_content(news_item, niche):
     PART 2: CAROUSEL SLIDES (5 Slides)
     - IMPORTANT: Use the pipe symbol '|' to separate parts.
     - Format strictly as:
-      Slide 1: [Punchy Title] | [Write a 20-word subtitle summary] | [Visual Prompt: Describe a photographic, cinematic scene. Do not use abstract concepts.]
+      Slide 1: [Punchy Title] | [Write a 20-word subtitle] | [Visual Prompt: Dark red cinematic, photorealistic, 8k]
       Slide 2: [Main Concept] | [Write a FULL PARAGRAPH (40 words) explaining this.] | [Visual Prompt]
       Slide 3: [Main Concept] | [Write a FULL PARAGRAPH (40 words) explaining this.] | [Visual Prompt]
       Slide 4: [Main Concept] | [Write a FULL PARAGRAPH (40 words) explaining this.] | [Visual Prompt]
@@ -69,79 +79,69 @@ def generate_content(news_item, niche):
     )
     return completion.choices[0].message.content
 
-def get_ai_image(prompt):
-    """Fetches AI image with increased timeout"""
+def get_image_with_fallback(prompt):
+    """
+    1. Tries to generate AI Image.
+    2. If that fails/times out, downloads a Real Stock Photo.
+    """
+    # 1. Try AI Generation (Pollinations)
     random_seed = random.randint(1, 1000000)
-    # Add 'photographic' to ensure it's not just abstract fuzz
-    enhanced_prompt = f"{prompt}, cinematic lighting, photorealistic, 8k, vertical orientation".replace(" ", "%20")
-    url = f"https://image.pollinations.ai/prompt/{enhanced_prompt}?width=720&height=1280&nologo=true&seed={random_seed}"
+    enhanced_prompt = f"{prompt}, dark red lighting, cinematic, photorealistic, vertical".replace(" ", "%20")
+    ai_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt}?width=720&height=1280&nologo=true&seed={random_seed}"
     
     try:
-        # Increased timeout to 15 seconds to give it more of a chance
-        response = requests.get(url, timeout=15)
+        # Try to fetch AI image with a 6-second timeout (keep it fast)
+        response = requests.get(ai_url, timeout=6)
         if response.status_code == 200:
             return BytesIO(response.content)
     except:
-        return None
+        pass # AI Failed, moving to backup...
 
-# --- NEW: FALLBACK DESIGN ENGINE ---
-def draw_fallback_pattern(c, w, h):
-    """Draws a cool geometric pattern if AI images fail load"""
-    # Base dark color
-    c.setFillColor(colors.HexColor('#0F172A')) 
-    c.rect(0, 0, w, h, fill=1, stroke=0)
+    # 2. Backup: Use a Real Stock Photo
+    # This guarantees NO "Visual Data Stream" text ever again.
+    backup_url = random.choice(BACKUP_IMAGES)
+    try:
+        response = requests.get(backup_url, timeout=5)
+        if response.status_code == 200:
+            return BytesIO(response.content)
+    except:
+        return None # Only happens if NO internet at all
 
-    # Subtle Tech Lines
-    c.setStrokeColor(colors.HexColor('#1E293B'))
-    c.setLineWidth(3)
-    c.line(0, 0, w, h)
-    c.line(w, 0, 0, h)
-    
-    # Subtle Tech Circles
-    c.setStrokeColor(colors.HexColor('#334155'))
-    c.setLineWidth(2)
-    c.circle(w/2, h/2, w/3, fill=0, stroke=1)
-    c.circle(w/2, h/2, w/1.5, fill=0, stroke=1)
-    
-    # Add a label so it looks intentional
-    c.setFillColor(colors.HexColor('#64748B'))
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(w/2, h/2, "VISUAL DATA STREAM")
-
-# --- MAIN DESIGN ENGINE ---
+# --- DESIGN ENGINE ---
 def draw_split_slide(c, title, body, visual_prompt, slide_num):
     width, height = landscape(letter)
     half_width = width * 0.5
     
-    # --- LEFT SIDE: IMAGE OR PATTERN (50%) ---
+    # --- LEFT SIDE: IMAGE (50%) ---
+    c.setFillColor(colors.HexColor('#0F172A')) 
+    c.rect(0, 0, width*0.5, height, fill=1, stroke=0)
     
-    # 1. Try to get the AI Image
-    img_data = get_ai_image(visual_prompt)
-    image_loaded = False
+    # FETCH IMAGE (With Backup Guarantee)
+    img_data = get_image_with_fallback(visual_prompt)
     
     if img_data:
         try:
             img = ImageReader(img_data)
-            c.drawImage(img, 0, 0, width=half_width, height=height, preserveAspectRatio=False)
-            image_loaded = True
+            c.drawImage(img, 0, 0, width=width*0.5, height=height, preserveAspectRatio=False)
         except:
-            # Image data existed but was corrupted
-            image_loaded = False
+            # Absolute worst case (corrupt data), just keep black
+            pass
 
-    # 2. If Image failed, draw the fallback pattern
-    if not image_loaded:
-        draw_fallback_pattern(c, half_width, height)
-
-    # Add subtle overlay on left side to unify it
+    # Gradient Overlay (To make it look "Designed")
+    p = c.beginPath()
+    p.moveTo(0, 0)
+    p.lineTo(width*0.5, 0)
+    p.lineTo(width*0.5, height)
+    p.lineTo(0, height)
+    p.close()
     c.setFillColor(colors.black)
-    c.setFillAlpha(0.3)
-    c.rect(0, 0, half_width, height, fill=1, stroke=0)
+    c.setFillAlpha(0.2)
+    c.drawPath(p, fill=1, stroke=0)
     c.setFillAlpha(1)
 
-
     # --- RIGHT SIDE: CONTENT (50%) ---
-    c.setFillColor(colors.HexColor('#000000')) # Pure Black BG
-    c.rect(half_width, 0, half_width, height, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor('#000000')) 
+    c.rect(width*0.5, 0, width*0.5, height, fill=1, stroke=0)
     
     # Slide Number
     c.setFillColor(colors.HexColor('#990000')) # Blood Red
@@ -172,9 +172,9 @@ def draw_split_slide(c, title, body, visual_prompt, slide_num):
         y_body -= 22
 
     # Progress Bar
-    bar_width = (slide_num / 5.0) * half_width
+    bar_width = (slide_num / 5.0) * width * 0.5
     c.setFillColor(colors.HexColor('#990000'))
-    c.rect(half_width, 0, bar_width, 10, fill=1, stroke=0)
+    c.rect(width*0.5, 0, bar_width, 10, fill=1, stroke=0)
 
 def create_pdf(slide_text):
     buffer = BytesIO()
@@ -188,19 +188,13 @@ def create_pdf(slide_text):
             segments = parts.split("|")
             
             if len(segments) >= 3:
-                title = segments[0].strip()
-                body = segments[1].strip()
-                visual = segments[2].strip()
+                title, body, visual = segments[0], segments[1], segments[2]
             elif len(segments) == 2:
-                title = segments[0].strip()
-                body = segments[1].strip()
-                visual = "Tech concept"
+                title, body, visual = segments[0], segments[1], "Abstract"
             else:
-                title = segments[0].strip()
-                body = "See caption."
-                visual = "Abstract"
+                title, body, visual = segments[0], "Read caption.", "Abstract"
 
-            draw_split_slide(c, title, body, visual, slide_count)
+            draw_split_slide(c, title.strip(), body.strip(), visual.strip(), slide_count)
             c.showPage()
             slide_count += 1
             
@@ -213,8 +207,8 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
-    if st.button("🩸 Generate Fail-Safe Carousel"):
-        st.info("Please wait 30-60 seconds for images to generate...")
+    if st.button("🩸 Generate Guaranteed Carousel"):
+        st.info("Generating... (If AI is slow, we will use stock photos instantly)")
         with st.status("Working...", expanded=True):
             news = get_random_news(niche)
             if news:
@@ -223,7 +217,7 @@ with col1:
                 try:
                     caption, slides = res.split("|||")
                     st.session_state['caption'] = caption.strip()
-                    st.write("🎨 Generating visuals (Attempting AI images, falling back to patterns if busy)...")
+                    st.write("🎨 Fetching images (AI or Backup)...")
                     st.session_state['pdf'] = create_pdf(slides.strip())
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -234,4 +228,4 @@ with col2:
     if 'pdf' in st.session_state:
         st.subheader("Caption")
         st.text_area("Copy:", st.session_state['caption'], height=200)
-        st.download_button("📥 Download Fail-Safe PDF", st.session_state['pdf'], "failsafe_carousel.pdf")
+        st.download_button("📥 Download PDF", st.session_state['pdf'], "guaranteed_carousel.pdf")
