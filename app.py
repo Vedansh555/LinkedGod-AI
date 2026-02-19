@@ -1,113 +1,159 @@
-import re
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+import streamlit as st
+from groq import Groq
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+from io import BytesIO
+import feedparser
+import re
 
-def clean_markdown(text):
-    """
-    Converts AI Markdown (**, #) into ReportLab XML tags for styling.
-    """
-    # 1. Bold: **text** -> <b>text</b>
+# --- CONFIGURATION ---
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except:
+    st.error("⚠️ Please put your GROQ_API_KEY in Streamlit Secrets!")
+    st.stop()
+
+client = Groq(api_key=GROQ_API_KEY)
+
+st.set_page_config(page_title="LinkedGod AI", layout="wide")
+st.title("🏭 Content Factory (Pro Edition)")
+
+# --- 1. LOGIC ---
+
+RSS_FEEDS = {
+    "Product Management": "https://techcrunch.com/category/startups/feed/",
+    "AI Agents": "https://www.artificialintelligence-news.com/feed/", 
+    "Consulting": "http://feeds.harvardbusiness.org/harvardbusiness"
+}
+
+def clean_text(text):
+    """Cleans AI text for PDF generation"""
+    # Convert **bold** to <b>bold</b> (ReportLab format)
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    
-    # 2. Italics: *text* -> <i>text</i>
+    # Convert *italic* to <i>italic</i>
     text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
-    
-    # 3. Clean up generic bullets
-    text = text.replace("- ", "• ")
-    
+    # Remove hashtags for clean PDF
+    text = re.sub(r'#\w+', '', text)
     return text
 
-def create_pro_pdf(ai_text, filename="professional_report.pdf", title="Viral Content Report"):
-    """
-    Generates a Consulting-Grade PDF using Platypus
-    """
-    doc = SimpleDocTemplate(
-        filename,
-        pagesize=letter,
-        rightMargin=72, leftMargin=72,
-        topMargin=72, bottomMargin=72
-    )
+def get_latest_news(niche):
+    feed = feedparser.parse(RSS_FEEDS.get(niche))
+    if feed.entries:
+        return feed.entries[0]
+    return None
+
+def generate_content(news_item, niche):
+    prompt = f"""
+    You are a generic LinkedIn expert.
+    NEWS: {news_item.title}
+    SUMMARY: {news_item.summary[:500]}
     
-    # Styles Setup
+    TASK: Write a 5-slide educational carousel about this news.
+    Format strictly as:
+    Slide 1: [Title]
+    Slide 2: [Point 1]
+    Slide 3: [Point 2]
+    Slide 4: [Point 3]
+    Slide 5: [Conclusion]
+    
+    Do NOT use '###' or markdown headers. Just plain text.
+    """
+    completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama-3.3-70b-versatile",
+    )
+    return completion.choices[0].message.content
+
+def create_memory_pdf(ai_text):
+    """Writes PDF to RAM (BytesIO) instead of Disk"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    
+    # Styles
     styles = getSampleStyleSheet()
     
-    # Custom Title Style
+    # Slide Title Style
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Title'],
-        fontSize=24,
-        spaceAfter=30,
-        textColor=colors.HexColor('#2E4053') # Professional Navy Blue
-    )
-    
-    # Custom Header Style
-    h1_style = ParagraphStyle(
-        'CustomH1',
+        'SlideTitle',
         parent=styles['Heading1'],
-        fontSize=18,
-        spaceBefore=20,
-        spaceAfter=10,
-        textColor=colors.HexColor('#2874A6'), # Ocean Blue
-        borderPadding=5,
-        borderColor=colors.HexColor('#E5E8E8'),
-        borderWidth=0,
-        backColor=None
+        fontSize=28,
+        textColor=colors.HexColor('#2E86C1'), # Blue
+        alignment=TA_CENTER,
+        spaceAfter=30
     )
     
-    # Professional Body Text
+    # Body Text Style
     body_style = ParagraphStyle(
-        'CustomBody',
+        'Body',
         parent=styles['BodyText'],
-        fontSize=11,
-        leading=15, # Good line spacing
-        alignment=TA_JUSTIFY
+        fontSize=18,
+        leading=24,
+        alignment=TA_CENTER
     )
 
-    # --- BUILD THE STORY ---
     story = []
     
-    # 1. Add Title Page
-    story.append(Spacer(1, 1*inch))
-    story.append(Paragraph(title, title_style))
-    story.append(Paragraph(f"Generated on: {datetime.date.today()}", styles['Normal']))
-    story.append(Spacer(1, 0.5*inch))
-    story.append(PageBreak()) # Start content on fresh page
-
-    # 2. Parse AI Text into Flowables
+    # Process text
     lines = ai_text.split('\n')
+    current_slide_text = []
     
     for line in lines:
         line = line.strip()
-        if not line:
-            story.append(Spacer(1, 0.1*inch))
-            continue
-            
-        # Headers (###)
-        if line.startswith('###') or line.startswith('##'):
-            clean_line = clean_markdown(line.replace('#', '').strip())
-            story.append(Paragraph(clean_line, h1_style))
+        if not line: continue
         
-        # Slides / Lists (Slide 1:)
-        elif line.startswith('Slide') or line.startswith('-') or line.startswith('•'):
-            clean_line = clean_markdown(line)
-            # Make lists look nice
-            story.append(Paragraph(clean_line, body_style))
-            story.append(Spacer(1, 0.05*inch))
+        # If new slide detected
+        if "Slide" in line and ":" in line:
+            # If we have previous content, add page break
+            if current_slide_text:
+                story.append(Spacer(1, 100))
+                story.append(PageBreak())
             
-        # Standard Text
+            # Add Slide Title (e.g., "Slide 1: The News")
+            clean_line = clean_text(line)
+            story.append(Spacer(1, 50))
+            story.append(Paragraph(clean_line, title_style))
+            current_slide_text = [line]
+            
         else:
-            clean_line = clean_markdown(line)
+            # Body text
+            clean_line = clean_text(line)
             story.append(Paragraph(clean_line, body_style))
+            current_slide_text.append(line)
 
-    # 3. Add a "Visual" Footer or Disclaimer
-    story.append(Spacer(1, 1*inch))
-    footer_text = "<i>Powered by Your AI Agent • Confidential Report</i>"
-    story.append(Paragraph(footer_text, styles['Normal']))
+    # If story is empty (AI failed), add error message to PDF
+    if not story:
+        story.append(Paragraph("Error: AI returned empty text.", styles['Normal']))
 
-    # 4. Build PDF
+    # Build PDF
     doc.build(story)
-    return filename
+    buffer.seek(0) # Rewind buffer to start
+    return buffer
+
+# --- 2. UI ---
+
+niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
+
+if st.button("Generate Pro PDF"):
+    with st.spinner("Fetching & Writing..."):
+        news = get_latest_news(niche)
+        if news:
+            st.success(f"Found: {news.title}")
+            
+            # Generate Text
+            ai_text = generate_content(news, niche)
+            st.text_area("AI Output (Debug)", ai_text, height=200) # DEBUG VIEW
+            
+            # Generate PDF in Memory
+            pdf_buffer = create_memory_pdf(ai_text)
+            
+            st.download_button(
+                label="📥 Download PDF (Guaranteed Work)",
+                data=pdf_buffer,
+                file_name="linkedin_carousel.pdf",
+                mime="application/pdf"
+            )
+        else:
+            st.error("No news found.")
