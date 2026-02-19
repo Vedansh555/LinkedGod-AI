@@ -40,21 +40,32 @@ def get_random_news(niche):
 
 def generate_content(news_item, niche):
     prompt = f"""
-You are a viral LinkedIn Ghostwriter.
+You are an elite LinkedIn Ghostwriter who writes for Fortune 500 executives and top founders.
 
 NEWS: {news_item.title}
 SUMMARY: {news_item.summary[:2000]}
 
 Output TWO parts separated by "|||".
 
-PART 1: CAPTION - Detailed Storytelling style (200 words).
+PART 1: CAPTION
+Write a long-form, professional LinkedIn caption (250-300 words) in this structure:
+- Open with a bold, thought-provoking single sentence (no fluff, no hype).
+- Follow with 2-3 short paragraphs that tell a real story: give context, explain why this matters, share a specific insight or data point.
+- Add a "Here is what most people miss:" section with a sharp, contrarian or nuanced take.
+- Close with a reflective question that invites genuine discussion.
+- End with 4-5 relevant hashtags on their own line.
+
+STRICT RULES FOR CAPTION:
+- Do NOT use asterisks (*) anywhere in the caption. Not even once.
+- Do NOT use buzzword fluff like "pushing boundaries", "redefining", "making waves", "poised for success".
+- Write like a real human expert, not a press release.
+- Use plain text only. No bold, no markdown, no symbols.
 
 |||
 
 PART 2: CAROUSEL SLIDES (5 Slides)
-- IMPORTANT: Write LONG, DETAILED paragraphs.
-- Each slide must have at least 50-60 words.
-- Use *asterisks* to highlight key phrases.
+- Write LONG, DETAILED paragraphs. Each slide body must be at least 50-60 words.
+- Use *asterisks* only inside slide body text to highlight key phrases (this is for PDF rendering).
 - Format strictly as:
 
 Slide 1: [Punchy Title] | [Write a 30-word powerful intro summary]
