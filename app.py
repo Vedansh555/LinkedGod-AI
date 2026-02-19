@@ -18,9 +18,9 @@ except:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-st.set_page_config(page_title="LinkedGod: Dense", layout="wide")
-st.title("📚 LinkedGod: Deep Dive Edition")
-st.markdown("Generates **Text-Heavy, High-Value Carousels** that fill the page.")
+st.set_page_config(page_title="LinkedGod: Titan", layout="wide")
+st.title("🏛️ LinkedGod: Titan Edition")
+st.markdown("Generates **Massive Text** slides that actually fill the screen.")
 
 RSS_FEEDS = {
     "Product Management": "https://techcrunch.com/category/startups/feed/",
@@ -50,14 +50,13 @@ def generate_content(news_item, niche):
     |||
     
     PART 2: CAROUSEL SLIDES (5 Slides)
-    - IMPORTANT: You MUST write long, detailed slides. 
-    - DO NOT use short bullet points. Use full sentences.
-    - Each slide must have 60-80 words of body text.
+    - IMPORTANT: Write LONG, DETAILED paragraphs. 
+    - Each slide must have at least 50-60 words.
     - Use *asterisks* to highlight key phrases.
     
     - Format strictly as:
       Slide 1: [Punchy Title] | [Write a 30-word powerful intro summary]
-      Slide 2: [Concept Name] | [Write a detailed paragraph explaining the problem. Then add a "Key Insight" sentence. FILL THE SPACE.]
+      Slide 2: [Concept Name] | [Write a detailed paragraph explaining the problem. Use strong language. FILL THE SPACE.]
       Slide 3: [Concept Name] | [Write a detailed paragraph explaining the solution. Explain WHY it works. FILL THE SPACE.]
       Slide 4: [Concept Name] | [Write a detailed paragraph about the future implication. Be specific. FILL THE SPACE.]
       Slide 5: [The Takeaway] | [Write a strong summary paragraph and a clear Call to Action.]
@@ -66,71 +65,85 @@ def generate_content(news_item, niche):
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
         model="llama-3.3-70b-versatile",
-        temperature=0.7 # Slightly lower temp for more focused writing
+        temperature=0.7 
     )
     return completion.choices[0].message.content
 
-# --- DESIGN ENGINE (DENSE MODE) ---
+# --- DESIGN ENGINE (SPOTLIGHT MODE) ---
 
 def draw_background(c, width, height):
-    # Dark Navy Professional BG
-    c.setFillColor(colors.HexColor('#0F172A')) 
+    """Draws a premium 'Spotlight' Radial Gradient"""
+    # 1. Base Dark Background
+    c.setFillColor(colors.HexColor('#020617')) # Almost Black
     c.rect(0, 0, width, height, fill=1, stroke=0)
     
-    # Grid
-    c.setStrokeColor(colors.HexColor('#1E293B'))
-    c.setLineWidth(1)
-    for x in range(0, int(width), 100):
-        c.line(x, 0, x, height)
-    for y in range(0, int(height), 100):
-        c.line(0, y, width, y)
+    # 2. "Spotlight" Circle (Simulated Gradient)
+    # We draw massive concentric circles with decreasing opacity
+    center_x, center_y = width/2, height/2
+    max_radius = width * 1.2
+    
+    # Dark Blue Glow
+    c.setFillColor(colors.HexColor('#1E3A8A')) # Dark Blue
+    c.setFillAlpha(0.03) # Very subtle
+    
+    for r in range(int(max_radius), 0, -20):
+        c.circle(center_x, center_y, r, fill=1, stroke=0)
+        
+    c.setFillAlpha(1) # Reset
+
+    # 3. Geometric Accents (The "Tech" Look)
+    c.setStrokeColor(colors.HexColor('#334155'))
+    c.setLineWidth(2)
+    
+    # Corner brackets
+    m = 60 # Margin
+    l = 100 # Length
+    # Top Left
+    c.line(m, height-m, m+l, height-m)
+    c.line(m, height-m, m, height-m-l)
+    # Bottom Right
+    c.line(width-m, m, width-m-l, m)
+    c.line(width-m, m, width-m, m+l)
 
 def draw_text_block(c, text, x, y, width, font_size):
     """
-    Draws a dense block of text with highlighting.
-    Handles wrapping for long paragraphs.
+    Draws text with Gold Highlights
     """
     c.setFont("Helvetica", font_size)
-    leading = font_size * 1.5 # Space between lines
+    leading = font_size * 1.4 # Space between lines
     
-    # Split by logical breaks if AI sends newlines, else treat as one block
     paragraphs = text.split('\n')
-    
     current_y = y
     
     for para in paragraphs:
         if not para.strip(): continue
         
-        # Split paragraph into words
         words = para.split(' ')
         current_line = []
         current_w = 0
         
         for word in words:
-            # Measure word (remove * for measurement)
             clean_word = word.replace('*', '')
             w = c.stringWidth(clean_word + " ", "Helvetica", font_size)
             
             if current_w + w > width:
-                # DRAW THE LINE
+                # DRAW LINE
                 cursor_x = x
                 for w_word in current_line:
                     is_bold = '*' in w_word
                     clean = w_word.replace('*', '')
                     
                     if is_bold:
-                        c.setFillColor(colors.HexColor('#F59E0B')) # Gold
+                        c.setFillColor(colors.HexColor('#FBBF24')) # Bright Gold
                         c.setFont("Helvetica-Bold", font_size)
                     else:
-                        c.setFillColor(colors.HexColor('#CBD5E1')) # Light Grey
+                        c.setFillColor(colors.HexColor('#E2E8F0')) # Bright White/Grey
                         c.setFont("Helvetica", font_size)
                         
                     c.drawString(cursor_x, current_y, clean)
-                    # Advance cursor
                     f_font = "Helvetica-Bold" if is_bold else "Helvetica"
                     cursor_x += c.stringWidth(clean + " ", f_font, font_size)
                 
-                # Reset for next line
                 current_line = [word]
                 current_w = w
                 current_y -= leading
@@ -138,24 +151,24 @@ def draw_text_block(c, text, x, y, width, font_size):
                 current_line.append(word)
                 current_w += w
         
-        # Draw the last remaining line of the paragraph
+        # Draw last line
         cursor_x = x
         for w_word in current_line:
             is_bold = '*' in w_word
             clean = w_word.replace('*', '')
             if is_bold:
-                c.setFillColor(colors.HexColor('#F59E0B'))
+                c.setFillColor(colors.HexColor('#FBBF24'))
                 c.setFont("Helvetica-Bold", font_size)
             else:
-                c.setFillColor(colors.HexColor('#CBD5E1'))
+                c.setFillColor(colors.HexColor('#E2E8F0'))
                 c.setFont("Helvetica", font_size)
             c.drawString(cursor_x, current_y, clean)
             f_font = "Helvetica-Bold" if is_bold else "Helvetica"
             cursor_x += c.stringWidth(clean + " ", f_font, font_size)
             
-        current_y -= (leading * 1.5) # Extra space between paragraphs
+        current_y -= (leading * 1.2)
 
-def create_dense_pdf(slide_text):
+def create_titan_pdf(slide_text):
     buffer = BytesIO()
     W, H = 1080, 1350 # Portrait
     c = canvas.Canvas(buffer, pagesize=(W, H))
@@ -178,30 +191,42 @@ def create_dense_pdf(slide_text):
             
             # 1. Slide Number
             c.setFillColor(colors.HexColor('#334155'))
-            c.setFont("Helvetica-Bold", 80)
-            c.drawRightString(W - 60, H - 100, f"{slide_num:02d}")
+            c.setFont("Helvetica-Bold", 100)
+            c.drawRightString(W - 60, H - 120, f"{slide_num:02d}")
             
-            # 2. Title (Higher up now)
+            # 2. Title (Massive)
             c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 65)
-            # Wrap Title
-            title_wrap = textwrap.wrap(title, width=20)
-            title_y = H - 200
-            for t in title_wrap:
+            c.setFont("Helvetica-Bold", 85)
+            
+            # Simple Title Wrap
+            title_words = title.split()
+            title_lines = []
+            curr_line = []
+            curr_w = 0
+            for word in title_words:
+                w = c.stringWidth(word + " ", "Helvetica-Bold", 85)
+                if curr_w + w > 900:
+                    title_lines.append(" ".join(curr_line))
+                    curr_line = [word]
+                    curr_w = w
+                else:
+                    curr_line.append(word)
+                    curr_w += w
+            title_lines.append(" ".join(curr_line))
+            
+            title_y = H - 220
+            for t in title_lines:
                 c.drawString(80, title_y, t)
-                title_y -= 80
+                title_y -= 95
             
-            # 3. Gold Divider
+            # 3. Gold Bar
             c.setStrokeColor(colors.HexColor('#F59E0B'))
-            c.setLineWidth(5)
-            c.line(80, title_y - 20, 300, title_y - 20)
+            c.setLineWidth(8)
+            c.line(80, title_y - 20, 350, title_y - 20)
             
-            # 4. Body Text (The Meat)
-            # Starting Y position is dynamic based on title height
-            body_start_y = title_y - 120 
-            
-            # Font size 34 (Readable but allows density)
-            draw_text_block(c, body, 80, body_start_y, 920, 34)
+            # 4. Body Text (The Fix: HUGE Font)
+            # Font size 48 is very large. It will fill the page.
+            draw_text_block(c, body, 80, title_y - 120, 920, 48)
             
             c.showPage()
             slide_num += 1
@@ -215,8 +240,8 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
-    if st.button("📚 Generate Deep Dive"):
-        with st.status("Writing long-form content...", expanded=True):
+    if st.button("🏛️ Generate Titan Post"):
+        with st.status("Forging content...", expanded=True):
             news = get_random_news(niche)
             if news:
                 st.write(f"✅ Topic: {news.title}")
@@ -224,8 +249,8 @@ with col1:
                 try:
                     caption, slides = res.split("|||")
                     st.session_state['caption'] = caption.strip()
-                    st.write("🎨 Fitting text to page...")
-                    st.session_state['pdf'] = create_dense_pdf(slides.strip())
+                    st.write("🎨 Painting Huge Canvas...")
+                    st.session_state['pdf'] = create_titan_pdf(slides.strip())
                 except Exception as e:
                     st.error(f"Error: {e}")
             else:
@@ -235,4 +260,4 @@ with col2:
     if 'pdf' in st.session_state:
         st.subheader("Caption")
         st.text_area("Copy:", st.session_state['caption'], height=200)
-        st.download_button("📥 Download Dense PDF", st.session_state['pdf'], "dense_carousel.pdf")
+        st.download_button("📥 Download Titan PDF", st.session_state['pdf'], "titan_carousel.pdf")
