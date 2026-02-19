@@ -77,19 +77,32 @@ SUMMARY: {news_item.summary[:2000]}
 Output TWO parts separated by "|||".
 
 PART 1: CAPTION
-Write a long-form LinkedIn caption (250-300 words) in {profile['caption_style']} style.
+Write a hook-first, SEO-optimised LinkedIn caption (280-320 words) in {profile['caption_style']} style built for maximum organic reach.
 
 Structure:
-- Open with a single punchy sentence that grabs attention (tone: {tone}).
-- 2-3 short paragraphs with real context, specific insights, and data points.
-- A "Here is what most people miss:" section with a sharp take.
-- A reflective discussion question.
-- 4-5 relevant hashtags on their own line.
+LINE 1 — THE HOOK: One sentence, max 12 words. Must create curiosity, tension, or shock depending on the tone. End with a colon or ellipsis to pull them into "see more". This is the most important line.
+
+[blank line]
+
+THE STORY: 3 short paragraphs (2-3 sentences each), blank line between each. Real insight, a specific stat or number, a surprising angle.
+
+[blank line]
+
+"Here is what nobody is talking about:" — your sharpest, most counterintuitive take in 2 sentences.
+
+[blank line]
+
+A direct debate-sparking question to the reader.
+
+[blank line]
+
+HASHTAGS: Exactly 8 hashtags on one line. Mix: 2 mega tags (1M+ like #leadership #innovation), 3 mid-tier niche tags (100K-500K), 3 hyper-specific topic tags for SEO discovery.
 
 STRICT RULES:
 - ZERO asterisks (*) in the caption.
-- ZERO buzzword fluff (no "pushing boundaries", "making waves", etc.).
-- Plain text only. No markdown, no symbols.
+- Hook line must be under 12 words. Non-negotiable.
+- ZERO fluff (no "pushing boundaries", "making waves", "game changer").
+- Plain text only. No markdown, no bullet points, no symbols except hashtags.
 
 |||
 
@@ -153,7 +166,7 @@ TONE_ACCENTS = {
     "Professional":   colors.HexColor('#2563EB'),
     "Controversial":  colors.HexColor('#DC2626'),
     "Scary / Urgent": colors.HexColor('#B91C1C'),
-    "Motivational":   colors.HexColor('#D97706'),
+    "Motivational":   colors.HexColor('#2563EB'),
     "Contrarian":     colors.HexColor('#7C3AED'),
 }
 
