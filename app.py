@@ -82,7 +82,7 @@ C_ACCENT_LINE   = colors.HexColor('#2563EB')   # Electric blue accent bar
 C_ACCENT_GLOW   = colors.HexColor('#1D4ED8')   # Darker blue for glow rect
 C_TITLE         = colors.HexColor('#F8FAFC')   # Near-white title
 C_BODY          = colors.HexColor('#CBD5E1')   # Soft slate body text
-C_HIGHLIGHT     = colors.HexColor('#FCD34D')   # Warm amber for *bold* words
+C_HIGHLIGHT     = colors.HexColor('#67E8F9')   # Light cyan for *bold* words
 C_SLIDE_NUM     = colors.HexColor('#1E3A5F')   # Dark-blue ghost number
 C_RULE          = colors.HexColor('#334155')   # Subtle divider
 C_TAG_BG        = colors.HexColor('#172554')   # Tag / pill background
@@ -272,10 +272,7 @@ def draw_slide(c, W, H, slide_num, total_slides, title, body):
 
     draw_rich_text(c, body, MARGIN_X, body_top_y, SAFE_WIDTH, body_font_size, line_height_ratio=1.55)
 
-    # ── Brand watermark ───────────────────────────────────────────
-    c.setFillColor(colors.HexColor('#1E3A5F'))
-    c.setFont('Helvetica-Bold', 22)
-    c.drawString(MARGIN_X, 18, 'LinkedGod · Titan Edition')
+
 
 
 def create_titan_pdf(slide_text):
