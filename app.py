@@ -19,9 +19,9 @@ except:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-st.set_page_config(page_title="LinkedGod: Blood Theme", layout="wide")
-st.title("🩸 LinkedGod: Blood & Visuals Edition")
-st.markdown("Generates **Dark, Visual, Blood-Themed Carousels** with Real AI Images.")
+st.set_page_config(page_title="LinkedGod: Magazine", layout="wide")
+st.title("🩸 LinkedGod: Magazine Edition")
+st.markdown("Generates **Full-Screen Visual Carousels** (Magazine Style).")
 
 # --- 1. LOGIC ---
 
@@ -42,22 +42,25 @@ def generate_content(news_item, niche):
     prompt = f"""
     You are a viral LinkedIn Ghostwriter.
     NEWS: {news_item.title}
-    SUMMARY: {news_item.summary[:800]}
+    SUMMARY: {news_item.summary[:1500]} 
     
     Output TWO parts separated by "|||".
     
     PART 1: CAPTION
-    - Hook + Body + 3 Hashtags.
+    - Write a "Storytelling" style post (approx 150 words).
+    - Start with a controversial hook.
+    - Use short lines.
+    - 3 hashtags.
     
     |||
     
     PART 2: CAROUSEL SLIDES (5 Slides)
     - Format strictly as:
-      Slide 1: [Short Title] - [Subtitle] - [Visual Prompt: Describe a dark, cinematic, red and black image representing this, e.g. 'Cyberpunk robot with red eyes, dark atmosphere']
-      Slide 2: [Concept] - [Explanation] - [Visual Prompt]
-      Slide 3: [Concept] - [Explanation] - [Visual Prompt]
-      Slide 4: [Concept] - [Explanation] - [Visual Prompt]
-      Slide 5: [Takeaway] - [Call to Action] - [Visual Prompt]
+      Slide 1: [Short Title] - [Subtitle] - [Visual Prompt: Describe a dark, red/black cinematic background image, e.g. 'Cyberpunk city with red neon, dark atmosphere']
+      Slide 2: [Concept Name] - [2-3 detailed sentences explaining it] - [Visual Prompt]
+      Slide 3: [Concept Name] - [2-3 detailed sentences explaining it] - [Visual Prompt]
+      Slide 4: [Concept Name] - [2-3 detailed sentences explaining it] - [Visual Prompt]
+      Slide 5: [The Takeaway] - [Call to Action] - [Visual Prompt]
     """
     
     completion = client.chat.completions.create(
@@ -66,105 +69,86 @@ def generate_content(news_item, niche):
     )
     return completion.choices[0].message.content
 
-# --- THE IMAGE GENERATOR (FIXED) ---
+# --- THE IMAGE GENERATOR (ROBUST) ---
 def get_ai_image(prompt):
-    """Fetches a real AI image from Pollinations.ai"""
-    # Force the style to be "Dark" and "Photorealistic" via prompt injection
-    enhanced_prompt = f"{prompt}, dark theme, red lighting, cinematic, 8k, photorealistic".replace(" ", "%20")
-    url = f"https://image.pollinations.ai/prompt/{enhanced_prompt}?width=1024&height=1024&nologo=true&seed=42"
+    """Fetches a real AI image. Includes a fallback if it fails."""
+    # Force 'dark red cinematic' style
+    enhanced_prompt = f"{prompt}, dark red lighting, cinematic, 8k, photorealistic, high contrast".replace(" ", "%20")
+    # We add a random seed to ensure uniqueness
+    url = f"https://image.pollinations.ai/prompt/{enhanced_prompt}?width=1280&height=720&nologo=true&seed=123"
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return BytesIO(response.content)
-    except Exception as e:
-        print(f"Image Error: {e}")
+    except:
+        pass
+        
+    # FALLBACK IMAGE (If AI fails, use a reliable dark background)
+    # This ensures you NEVER get a white blank slide.
+    try:
+        fallback_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop"
+        response = requests.get(fallback_url, timeout=5)
+        return BytesIO(response.content)
+    except:
         return None
-    return None
 
-# --- THE DESIGN ENGINE (BLOOD THEME) ---
+# --- THE DESIGN ENGINE (MAGAZINE STYLE) ---
 
-def draw_blood_slide(c, title, body, visual_prompt, slide_num):
+def draw_magazine_slide(c, title, body, visual_prompt, slide_num):
     width, height = landscape(letter)
     
-    # --- 1. LAYOUT: SPLIT SCREEN (50/50) ---
-    
-    # RIGHT SIDE: CONTENT (Black Background)
-    c.setFillColor(colors.HexColor('#000000')) # Pure Black
-    c.rect(width*0.5, 0, width*0.5, height, fill=1, stroke=0)
-    
-    # LEFT SIDE: IMAGE PLACEHOLDER (Dark Grey default)
-    c.setFillColor(colors.HexColor('#0A0A0A')) 
-    c.rect(0, 0, width*0.5, height, fill=1, stroke=0)
-
-    # --- 2. DRAW THE AI IMAGE (Left Side) ---
+    # 1. DRAW BACKGROUND IMAGE (Full Screen)
     img_data = get_ai_image(visual_prompt)
     if img_data:
         try:
             img = ImageReader(img_data)
-            # Draw image filling the left half completely
-            c.drawImage(img, 0, 0, width=width*0.5, height=height, preserveAspectRatio=False)
+            c.drawImage(img, 0, 0, width=width, height=height, preserveAspectRatio=False)
         except:
-            # Fallback if image fails to load: Draw a Red X
-            c.setStrokeColor(colors.white)
-            c.line(0,0, width*0.5, height)
-            c.line(0, height, width*0.5, 0)
+            # Absolute Fail-Safe: Black Background
+            c.setFillColor(colors.black)
+            c.rect(0, 0, width, height, fill=1)
             
-    # Add a "Vignette" overlay to the image (Darkens edges)
-    # This makes the white text pop if we ever put text on it, but looks cool anyway
-    p = c.beginPath()
-    p.moveTo(width*0.5, 0)
-    p.lineTo(width*0.5, height)
-    p.lineTo(width*0.4, height)
-    p.lineTo(width*0.4, 0)
-    p.close()
+    # 2. DRAW "GLASS" OVERLAY (Darkens the image so text pops)
+    # We draw a semi-transparent black box over the WHOLE image
     c.setFillColor(colors.black)
-    c.setFillAlpha(0.3)
-    c.drawPath(p, fill=1, stroke=0)
+    c.setFillAlpha(0.85) # 85% Dark - Very readable
+    c.rect(0, 0, width, height, fill=1, stroke=0)
     c.setFillAlpha(1) # Reset alpha
 
-    # --- 3. TYPOGRAPHY (Right Side) ---
+    # 3. TYPOGRAPHY
     
-    # BLOOD RED ACCENT LINE
-    c.setStrokeColor(colors.HexColor('#990000')) # Blood Red
-    c.setLineWidth(8)
-    c.line(width*0.5, height-40, width*0.5, 40) # Vertical divider line
+    # Slide Number (Huge Watermark Style)
+    c.setFillColor(colors.HexColor('#990000')) # Blood Red
+    c.setFont("Helvetica-Bold", 180)
+    c.setFillAlpha(0.2) # Subtle watermark
+    c.drawRightString(width - 20, 20, f"{slide_num:02d}")
+    c.setFillAlpha(1)
 
-    # Slide Number (Huge, Blood Red)
-    c.setFillColor(colors.HexColor('#990000')) 
-    c.setFont("Helvetica-Bold", 120)
-    # Positioned slightly off-screen for that magazine look
-    c.drawRightString(width - 20, height - 100, f"{slide_num:02d}")
-
-    # Title (White, Bold)
+    # Title (White, Big)
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 32)
+    c.setFont("Helvetica-Bold", 36)
     
-    title_lines = textwrap.wrap(title, width=20)
-    y_text = height * 0.65
+    title_lines = textwrap.wrap(title, width=30)
+    y_text = height * 0.75
     for line in title_lines:
-        c.drawString(width*0.55, y_text, line)
-        y_text -= 40
+        c.drawCentredString(width/2, y_text, line)
+        y_text -= 45
         
-    # Horizontal Red Accent under Title
+    # Red Accent Line
     c.setStrokeColor(colors.HexColor('#FF0000')) # Bright Red
-    c.setLineWidth(3)
-    c.line(width*0.55, y_text+10, width*0.65, y_text+10)
+    c.setLineWidth(4)
+    c.line(width*0.4, y_text+10, width*0.6, y_text+10)
     
-    # Body Text (Light Grey)
-    c.setFillColor(colors.HexColor('#E0E0E0')) 
-    c.setFont("Helvetica", 18)
+    # Body Text (Centered, Readable)
+    c.setFillColor(colors.HexColor('#E5E5E5')) # Off-White
+    c.setFont("Helvetica", 20)
     
-    body_lines = textwrap.wrap(body, width=35)
+    body_lines = textwrap.wrap(body, width=50) # Wider text area
     y_body = y_text - 40
     for line in body_lines:
-        c.drawString(width*0.55, y_body, line)
-        y_body -= 28
-        
-    # Footer (Branding)
-    c.setFillColor(colors.HexColor('#555555'))
-    c.setFont("Helvetica", 10)
-    c.drawString(width*0.55, 30, "GENERATED BY LINKEDGOD AI")
+        c.drawCentredString(width/2, y_body, line)
+        y_body -= 30
 
 def create_visual_pdf(slide_text):
     buffer = BytesIO()
@@ -175,7 +159,6 @@ def create_visual_pdf(slide_text):
     
     for line in lines:
         if "Slide" in line and ":" in line:
-            # Expected format: Slide 1: Title - Body - VisualPrompt
             parts = line.split(":", 1)[1].strip()
             segments = parts.split("-")
             
@@ -186,13 +169,13 @@ def create_visual_pdf(slide_text):
             elif len(segments) == 2:
                 title = segments[0].strip()
                 body = segments[1].strip()
-                visual = "Abstract dark red and black technology background" 
+                visual = "Dark red abstract background"
             else:
                 title = segments[0].strip()
                 body = ""
                 visual = "Dark void"
 
-            draw_blood_slide(c, title, body, visual, slide_count)
+            draw_magazine_slide(c, title, body, visual, slide_count)
             c.showPage()
             slide_count += 1
         
@@ -207,14 +190,14 @@ col1, col2 = st.columns([1, 1])
 with col1:
     niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
     
-    if st.button("🩸 Generate Blood Theme"):
-        with st.status("Summoning Content...", expanded=True):
+    if st.button("🩸 Generate Magazine Post"):
+        with st.status("Agent Working...", expanded=True):
             st.write("📡 Fetching News...")
             news = get_latest_news(niche)
             
             if news:
                 st.write(f"✅ Found: {news.title}")
-                st.write("🧠 Writing & Dreaming Images...")
+                st.write("🧠 Dreaming of Visuals...")
                 full_res = generate_content(news, niche)
                 
                 try:
@@ -222,7 +205,7 @@ with col1:
                     st.session_state['caption'] = caption.strip()
                     st.session_state['slides'] = slides.strip()
                     
-                    st.write("🎨 Painting Images & PDF...")
+                    st.write("🎨 Rendering Magazine PDF...")
                     pdf_data = create_visual_pdf(st.session_state['slides'])
                     st.session_state['pdf_data'] = pdf_data
                 except Exception as e:
@@ -232,6 +215,6 @@ with col1:
 
 with col2:
     if 'pdf_data' in st.session_state:
-        st.subheader("Caption")
-        st.text_area("Copy:", st.session_state['caption'], height=200)
-        st.download_button("📥 Download Blood PDF", st.session_state['pdf_data'], "blood_carousel.pdf")
+        st.subheader("Viral Caption")
+        st.text_area("Copy:", st.session_state['caption'], height=350)
+        st.download_button("📥 Download Magazine PDF", st.session_state['pdf_data'], "magazine_carousel.pdf")
