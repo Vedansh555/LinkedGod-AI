@@ -3,8 +3,6 @@ from groq import Groq
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
 import feedparser
 import random
@@ -20,9 +18,9 @@ except:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-st.set_page_config(page_title="LinkedGod: Titan", layout="wide")
-st.title("🏛️ LinkedGod: Typography Titan")
-st.markdown("Generates **4:5 Portrait Carousels** (Mobile Optimized). No Images. Pure Design.")
+st.set_page_config(page_title="LinkedGod: Dense", layout="wide")
+st.title("📚 LinkedGod: Deep Dive Edition")
+st.markdown("Generates **Text-Heavy, High-Value Carousels** that fill the page.")
 
 RSS_FEEDS = {
     "Product Management": "https://techcrunch.com/category/startups/feed/",
@@ -42,123 +40,124 @@ def generate_content(news_item, niche):
     prompt = f"""
     You are a viral LinkedIn Ghostwriter.
     NEWS: {news_item.title}
-    SUMMARY: {news_item.summary[:1500]}
+    SUMMARY: {news_item.summary[:2000]}
     
     Output TWO parts separated by "|||".
     
     PART 1: CAPTION
-    - Hook + Body + 3 Hashtags.
+    - Detailed Storytelling style (200 words).
     
     |||
     
     PART 2: CAROUSEL SLIDES (5 Slides)
-    - IMPORTANT: Use the pipe symbol '|' to separate Title and Body.
-    - WRITING RULES:
-      - Use *asterisks* to highlight key words (e.g. "AI is *dangerous*").
-      - Body must be 3-4 bullet points or short punchy sentences.
-      
+    - IMPORTANT: You MUST write long, detailed slides. 
+    - DO NOT use short bullet points. Use full sentences.
+    - Each slide must have 60-80 words of body text.
+    - Use *asterisks* to highlight key phrases.
+    
     - Format strictly as:
-      Slide 1: [Short Title] | [Subtitle with *highlight*]
-      Slide 2: [Main Point] | [Bullet 1 with *highlight* \n Bullet 2 \n Bullet 3]
-      Slide 3: [Main Point] | [Bullet 1 \n Bullet 2 with *highlight* \n Bullet 3]
-      Slide 4: [Main Point] | [Bullet 1 \n Bullet 2 \n Bullet 3 with *highlight*]
-      Slide 5: [The Takeaway] | [Strong conclusion and CTA]
+      Slide 1: [Punchy Title] | [Write a 30-word powerful intro summary]
+      Slide 2: [Concept Name] | [Write a detailed paragraph explaining the problem. Then add a "Key Insight" sentence. FILL THE SPACE.]
+      Slide 3: [Concept Name] | [Write a detailed paragraph explaining the solution. Explain WHY it works. FILL THE SPACE.]
+      Slide 4: [Concept Name] | [Write a detailed paragraph about the future implication. Be specific. FILL THE SPACE.]
+      Slide 5: [The Takeaway] | [Write a strong summary paragraph and a clear Call to Action.]
     """
     
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
         model="llama-3.3-70b-versatile",
-        temperature=0.8
+        temperature=0.7 # Slightly lower temp for more focused writing
     )
     return completion.choices[0].message.content
 
-# --- THE GEOMETRIC BACKGROUND ENGINE (NO INTERNET REQUIRED) ---
+# --- DESIGN ENGINE (DENSE MODE) ---
+
 def draw_background(c, width, height):
-    """Draws a premium dark gradient + subtle grid"""
-    
-    # 1. Base Dark Navy
-    c.setFillColor(colors.HexColor('#0B1120')) # Deepest Blue/Black
+    # Dark Navy Professional BG
+    c.setFillColor(colors.HexColor('#0F172A')) 
     c.rect(0, 0, width, height, fill=1, stroke=0)
     
-    # 2. Subtle Grid Pattern
+    # Grid
     c.setStrokeColor(colors.HexColor('#1E293B'))
     c.setLineWidth(1)
-    step = 100
-    for x in range(0, int(width), step):
+    for x in range(0, int(width), 100):
         c.line(x, 0, x, height)
-    for y in range(0, int(height), step):
+    for y in range(0, int(height), 100):
         c.line(0, y, width, y)
-        
-    # 3. Top Gradient Accent (Blue Glow)
-    p = c.beginPath()
-    p.moveTo(0, height)
-    p.lineTo(width, height)
-    p.lineTo(width, height - 200)
-    p.lineTo(0, height - 50)
-    p.close()
-    c.setFillColor(colors.HexColor('#1D4ED8')) # Electric Blue
-    c.setFillAlpha(0.2)
-    c.drawPath(p, fill=1, stroke=0)
-    c.setFillAlpha(1)
 
-def draw_highlighted_text(c, text, x, y, width, font_size, align="left"):
-    """Parses text for *bold* and draws it in GOLD color"""
-    
+def draw_text_block(c, text, x, y, width, font_size):
+    """
+    Draws a dense block of text with highlighting.
+    Handles wrapping for long paragraphs.
+    """
     c.setFont("Helvetica", font_size)
-    leading = font_size * 1.4
-    words = text.split(" ")
+    leading = font_size * 1.5 # Space between lines
     
-    current_line = []
-    current_width = 0
+    # Split by logical breaks if AI sends newlines, else treat as one block
+    paragraphs = text.split('\n')
     
-    # Simple word wrapper logic
-    lines = []
-    for word in words:
-        # Check width
-        w = c.stringWidth(word + " ", "Helvetica", font_size)
-        if current_width + w > width:
-            lines.append(current_line)
-            current_line = [word]
-            current_width = w
-        else:
-            current_line.append(word)
-            current_width += w
-    lines.append(current_line)
+    current_y = y
     
-    # Draw Lines
-    for line_words in lines:
-        if align == "center":
-            # Calculate total line width to center it
-            line_str = " ".join(line_words).replace("*", "")
-            total_w = c.stringWidth(line_str, "Helvetica", font_size)
-            cursor_x = (1080 - total_w) / 2 # Center of 1080 canvas
-        else:
-            cursor_x = x
+    for para in paragraphs:
+        if not para.strip(): continue
+        
+        # Split paragraph into words
+        words = para.split(' ')
+        current_line = []
+        current_w = 0
+        
+        for word in words:
+            # Measure word (remove * for measurement)
+            clean_word = word.replace('*', '')
+            w = c.stringWidth(clean_word + " ", "Helvetica", font_size)
             
-        for word in line_words:
-            # Check for highlight
-            clean_word = word.replace("\n", "")
-            is_highlight = "*" in clean_word
-            clean_word = clean_word.replace("*", "")
-            
-            if is_highlight:
-                c.setFillColor(colors.HexColor('#F59E0B')) # GOLD Highlight
+            if current_w + w > width:
+                # DRAW THE LINE
+                cursor_x = x
+                for w_word in current_line:
+                    is_bold = '*' in w_word
+                    clean = w_word.replace('*', '')
+                    
+                    if is_bold:
+                        c.setFillColor(colors.HexColor('#F59E0B')) # Gold
+                        c.setFont("Helvetica-Bold", font_size)
+                    else:
+                        c.setFillColor(colors.HexColor('#CBD5E1')) # Light Grey
+                        c.setFont("Helvetica", font_size)
+                        
+                    c.drawString(cursor_x, current_y, clean)
+                    # Advance cursor
+                    f_font = "Helvetica-Bold" if is_bold else "Helvetica"
+                    cursor_x += c.stringWidth(clean + " ", f_font, font_size)
+                
+                # Reset for next line
+                current_line = [word]
+                current_w = w
+                current_y -= leading
+            else:
+                current_line.append(word)
+                current_w += w
+        
+        # Draw the last remaining line of the paragraph
+        cursor_x = x
+        for w_word in current_line:
+            is_bold = '*' in w_word
+            clean = w_word.replace('*', '')
+            if is_bold:
+                c.setFillColor(colors.HexColor('#F59E0B'))
                 c.setFont("Helvetica-Bold", font_size)
             else:
-                c.setFillColor(colors.HexColor('#F8FAFC')) # White/Grey
+                c.setFillColor(colors.HexColor('#CBD5E1'))
                 c.setFont("Helvetica", font_size)
-                
-            c.drawString(cursor_x, y, clean_word)
-            cursor_x += c.stringWidth(clean_word + " ", "Helvetica", font_size) if not is_highlight else c.stringWidth(clean_word + " ", "Helvetica-Bold", font_size)
+            c.drawString(cursor_x, current_y, clean)
+            f_font = "Helvetica-Bold" if is_bold else "Helvetica"
+            cursor_x += c.stringWidth(clean + " ", f_font, font_size)
             
-        y -= leading
-        
-    return y # Return new Y position
+        current_y -= (leading * 1.5) # Extra space between paragraphs
 
-def create_portrait_pdf(slide_text):
+def create_dense_pdf(slide_text):
     buffer = BytesIO()
-    # 4:5 Aspect Ratio (1080x1350) - Standard LinkedIn Portrait
-    W, H = 1080, 1350
+    W, H = 1080, 1350 # Portrait
     c = canvas.Canvas(buffer, pagesize=(W, H))
     
     lines = slide_text.strip().split('\n')
@@ -167,64 +166,42 @@ def create_portrait_pdf(slide_text):
     for line in lines:
         if "Slide" in line and ":" in line:
             parts = line.split(":", 1)[1].strip()
-            # Split Title | Body
             if "|" in parts:
                 title, body = parts.split("|", 1)
             else:
-                title, body = parts, "Swipe to read more"
+                title, body = parts, "Content loading..."
                 
             title = title.strip()
-            body = body.strip().replace(r"\n", "\n") # Handle newlines
+            body = body.strip()
             
-            # --- DRAW SLIDE ---
             draw_background(c, W, H)
             
-            # 1. Slide Number (Top Right)
+            # 1. Slide Number
             c.setFillColor(colors.HexColor('#334155'))
-            c.setFont("Helvetica-Bold", 60)
-            c.drawRightString(W - 50, H - 80, f"{slide_num:02d}")
+            c.setFont("Helvetica-Bold", 80)
+            c.drawRightString(W - 60, H - 100, f"{slide_num:02d}")
             
-            # 2. Title (Big, Top Left)
+            # 2. Title (Higher up now)
             c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 70) # Massive Title
-            
+            c.setFont("Helvetica-Bold", 65)
             # Wrap Title
-            title_obj = c.beginText(60, H - 250)
-            title_obj.setFont("Helvetica-Bold", 70)
-            title_lines = textwrap.wrap(title, width=18)
-            for t_line in title_lines:
-                title_obj.textLine(t_line)
-            c.drawText(title_obj)
+            title_wrap = textwrap.wrap(title, width=20)
+            title_y = H - 200
+            for t in title_wrap:
+                c.drawString(80, title_y, t)
+                title_y -= 80
             
-            # 3. Accent Line
-            y_pos = H - 250 - (len(title_lines)*80)
-            c.setStrokeColor(colors.HexColor('#F59E0B')) # Gold
-            c.setLineWidth(6)
-            c.line(60, y_pos, 260, y_pos)
+            # 3. Gold Divider
+            c.setStrokeColor(colors.HexColor('#F59E0B'))
+            c.setLineWidth(5)
+            c.line(80, title_y - 20, 300, title_y - 20)
             
-            # 4. Body Text (The "Good Amount of Text")
-            # We treat '\n' as line breaks
-            body_parts = body.split('\n')
+            # 4. Body Text (The Meat)
+            # Starting Y position is dynamic based on title height
+            body_start_y = title_y - 120 
             
-            text_y = y_pos - 100
-            for part in body_parts:
-                part = part.strip()
-                if not part: continue
-                # Draw bullet symbol
-                c.setFillColor(colors.HexColor('#3B82F6')) # Blue bullet
-                c.setFont("Helvetica-Bold", 40)
-                c.drawString(60, text_y, "•")
-                
-                # Draw highlighted text
-                # We offset X by 50px to make room for bullet
-                new_y = draw_highlighted_text(c, part, 110, text_y, 850, 45, align="left")
-                text_y = new_y - 30 # Extra spacing between bullets
-            
-            # 5. Swipe Arrow (Bottom)
-            if slide_num < 5:
-                c.setFillColor(colors.white)
-                c.setFont("Helvetica", 30)
-                c.drawCentredString(W/2, 60, "Swipe ➜")
+            # Font size 34 (Readable but allows density)
+            draw_text_block(c, body, 80, body_start_y, 920, 34)
             
             c.showPage()
             slide_num += 1
@@ -238,8 +215,8 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
-    if st.button("🏛️ Generate Portrait Carousel"):
-        with st.status("Architecting content...", expanded=True):
+    if st.button("📚 Generate Deep Dive"):
+        with st.status("Writing long-form content...", expanded=True):
             news = get_random_news(niche)
             if news:
                 st.write(f"✅ Topic: {news.title}")
@@ -247,8 +224,8 @@ with col1:
                 try:
                     caption, slides = res.split("|||")
                     st.session_state['caption'] = caption.strip()
-                    st.write("🎨 Rendering 1080x1350 Canvas...")
-                    st.session_state['pdf'] = create_portrait_pdf(slides.strip())
+                    st.write("🎨 Fitting text to page...")
+                    st.session_state['pdf'] = create_dense_pdf(slides.strip())
                 except Exception as e:
                     st.error(f"Error: {e}")
             else:
@@ -258,4 +235,4 @@ with col2:
     if 'pdf' in st.session_state:
         st.subheader("Caption")
         st.text_area("Copy:", st.session_state['caption'], height=200)
-        st.download_button("📥 Download Portrait PDF (Mobile Ready)", st.session_state['pdf'], "portrait_carousel.pdf")
+        st.download_button("📥 Download Dense PDF", st.session_state['pdf'], "dense_carousel.pdf")
