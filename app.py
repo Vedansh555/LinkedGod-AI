@@ -3,43 +3,71 @@ from groq import Groq
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from duckduckgo_search import DDGS
+import feedparser
 import textwrap
-import datetime
+import re
 
 # --- CONFIGURATION ---
-# 1. Get your Key from: https://console.groq.com/keys
-# 2. Put it in Streamlit Secrets (Settings -> Secrets)
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 except:
     st.error("⚠️ Please put your GROQ_API_KEY in Streamlit Secrets!")
     st.stop()
 
+# Initialize Groq Client
 client = Groq(api_key=GROQ_API_KEY)
 
 st.set_page_config(page_title="Content Factory", layout="wide")
 st.title("🏭 The Semi-Auto Content Factory")
-st.markdown("Search News $\to$ Viral Post $\to$ PDF Carousel (in 30s)")
+st.markdown("Real News Feeds $\to$ Viral Post $\to$ PDF Carousel")
 
-# --- 1. THE BRAIN (Functions) ---
+# --- 1. THE BRAIN (RSS Feed Logic) ---
 
-def get_latest_news(query):
-    """Searches DuckDuckGo for latest news on the topic"""
-    with DDGS() as ddgs:
-        results = list(ddgs.news(query, max_results=1))
-        if results:
-            return results[0] # Returns title, body, url
+RSS_FEEDS = {
+    "Product Management": "https://techcrunch.com/category/startups/feed/",
+    "AI Agents": "https://www.artificialintelligence-news.com/feed/", 
+    "Management Consulting": "http://feeds.harvardbusiness.org/harvardbusiness", 
+    "Startup Life": "https://news.ycombinator.com/rss"
+}
+
+def clean_html(raw_html):
+    """Removes HTML tags so the AI doesn't get confused"""
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext
+
+def get_latest_news_from_rss(niche):
+    """Fetches and CLEANS the latest article"""
+    feed_url = RSS_FEEDS.get(niche)
+    if not feed_url:
         return None
+        
+    feed = feedparser.parse(feed_url)
+    
+    if feed.entries:
+        entry = feed.entries[0]
+        
+        # FIX: Handle potential missing summary
+        raw_summary = getattr(entry, 'summary', 'No summary available.')
+        clean_summary = clean_html(raw_summary)
+        
+        # FIX: Truncate to 3000 chars to prevent 'BadRequestError'
+        return {
+            'title': entry.title,
+            'summary': clean_summary[:3000], 
+            'link': entry.link
+        }
+    return None
 
 def generate_viral_content(news_item, niche):
-    """Uses Llama 3 to write the post and slides"""
+    """Uses Llama 3.3 to write the post and slides"""
     
     prompt = f"""
     You are a top LinkedIn Creator in {niche}.
+    
     NEWS UPDATE: {news_item['title']}
-    CONTEXT: {news_item['body']}
-    SOURCE: {news_item['url']}
+    SUMMARY: {news_item['summary']}
+    SOURCE LINK: {news_item['link']}
 
     TASK 1: Write a LinkedIn Post.
     - Hook: Punchy, controversial, or "Breaking News" style.
@@ -48,6 +76,7 @@ def generate_viral_content(news_item, niche):
     - No hashtags in the middle, only 3 at the end.
 
     TASK 2: Create a 5-Slide Carousel Outline.
+    - The content must be educational.
     - Format strictly as:
       Slide 1: [Title]
       Slide 2: [Point 1]
@@ -56,9 +85,11 @@ def generate_viral_content(news_item, niche):
       Slide 5: [Takeaway]
     """
     
+    # FIX: Switched to 'llama-3.3-70b-versatile' for better stability
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile", 
+        temperature=0.7
     )
     return completion.choices[0].message.content
 
@@ -67,34 +98,37 @@ def create_pdf(text_content, filename="carousel.pdf"):
     c = canvas.Canvas(filename, pagesize=landscape(letter))
     width, height = landscape(letter)
     
-    # Extract slides from text
     lines = text_content.split('\n')
     slides = [line for line in lines if "Slide" in line]
     
     if not slides:
-        slides = ["Slide 1: Breaking News", "Slide 2: Read the caption"]
+        # Fallback if AI formatting fails
+        slides = ["Slide 1: Breaking News", "Slide 2: Check the post text"]
 
     for slide in slides:
-        # Dark Mode Design
+        # 1. Background (Black)
         c.setFillColor(colors.black)
         c.rect(0, 0, width, height, fill=1)
         
-        # Text
+        # 2. Main Text (White)
         c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 28)
+        c.setFont("Helvetica-Bold", 26)
         
-        # Clean the "Slide X:" part for cleaner look
+        # Clean the "Slide X:" part
         display_text = slide.split(":", 1)[-1].strip() if ":" in slide else slide
         
-        # Wrap text
+        # Text Wrapping
         wrapped_text = textwrap.wrap(display_text, width=45)
-        y = height / 2 + (len(wrapped_text)*15)
+        
+        # Center the block of text
+        total_text_height = len(wrapped_text) * 45
+        start_y = (height / 2) + (total_text_height / 2) - 20
         
         for line in wrapped_text:
-            c.drawCentredString(width/2, y, line)
-            y -= 45
+            c.drawCentredString(width/2, start_y, line)
+            start_y -= 45
             
-        # Branding
+        # 3. Footer/Branding (Yellow)
         c.setFillColor(colors.yellow)
         c.setFont("Helvetica", 12)
         c.drawString(30, 30, "Generated by AI • Curated by You")
@@ -110,39 +144,39 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("1. Pick Your Angle")
-    niche = st.selectbox("Select Niche", ["Product Management", "AI Agents", "Management Consulting", "Startup Life"])
+    niche = st.selectbox("Select Niche", list(RSS_FEEDS.keys()))
     
-    if st.button("🔴 Find News & Generate"):
+    if st.button("🔴 Fetch Live News & Generate"):
         with st.status("Agent is working...", expanded=True) as status:
             
-            # A. Search
-            st.write("🔍 Searching Global News...")
-            query = f"latest {niche} news trends"
-            news = get_latest_news(query)
+            # A. Search (RSS)
+            st.write(f"📡 Connecting to {niche} Feed...")
+            news = get_latest_news_from_rss(niche)
             
             if not news:
-                st.error("No news found. Try again.")
+                st.error("Feed unavailable. Try again later.")
                 st.stop()
                 
-            st.write(f"✅ Found: **{news['title']}**")
+            st.success(f"✅ Found: **{news['title']}**")
             
             # B. Write
             st.write("✍️ Drafting Viral Post...")
-            ai_output = generate_viral_content(news, niche)
-            
-            # Separate Post from Slides (Simple logic)
-            # Assuming AI puts slides at the end. 
-            # In production, we'd use JSON mode for cleaner separation.
-            st.session_state['full_text'] = ai_output
-            
-            # C. Design
-            st.write("🎨 Designing Carousel...")
-            pdf_path = create_pdf(ai_output)
-            
-            with open(pdf_path, "rb") as f:
-                st.session_state['pdf_data'] = f.read()
+            try:
+                ai_output = generate_viral_content(news, niche)
+                st.session_state['full_text'] = ai_output
                 
-            status.update(label="Content Ready!", state="complete", expanded=False)
+                # C. Design
+                st.write("🎨 Designing Carousel...")
+                pdf_path = create_pdf(ai_output)
+                
+                with open(pdf_path, "rb") as f:
+                    st.session_state['pdf_data'] = f.read()
+                    
+                status.update(label="Content Ready!", state="complete", expanded=False)
+            
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+                st.stop()
 
 # --- 3. OUTPUTS ---
 with col2:
@@ -153,14 +187,13 @@ with col2:
         
         with tab1:
             st.text_area("Copy to LinkedIn:", st.session_state['full_text'], height=400)
-            st.info("💡 Tip: Add your own 1-line opinion at the top to make it personal.")
             
         with tab2:
             st.success("PDF Generated Successfully")
-            st.download_button(
-                label="📥 Download Carousel PDF",
-                data=st.session_state['pdf_data'],
-                file_name="viral_carousel.pdf",
-                mime="application/pdf"
-            )
-            st.caption("Upload this as a 'Document' on LinkedIn to get 3x more reach.")
+            if 'pdf_data' in st.session_state:
+                st.download_button(
+                    label="📥 Download Carousel PDF",
+                    data=st.session_state['pdf_data'],
+                    file_name="viral_carousel.pdf",
+                    mime="application/pdf"
+                )
